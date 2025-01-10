@@ -78,7 +78,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         const correctWord = await vscode.window.showInputBox({
             prompt: `Enter the correct case for "${originalWord}":`,
-            value: originalWord,
+            value: '',
         });
 
         if (!correctWord) {

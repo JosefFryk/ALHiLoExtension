@@ -2,7 +2,7 @@
 	"name": "HiLo-case",
 	"displayName": "HiLo-case",
 	"description": "Converts text to correct case with use of reference list.",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"publisher": "forey-apps",
 	"repository": "https://github.com/JosefFryk/ALHiLoExtension",
 	"engines": {
@@ -21,11 +21,24 @@
 				"caseCorrector.referenceList": {
 					"type": "object",
 					"default": {
-						"javascript": "JavaScript",
-						"typescript": "TypeScript",
-						"vscode": "VSCode"
+						"BEGIN": "begin",
+						"END": "end",
+						"IF": "if",
+						"ELSE": "else",
+						"UNTIL": "until",
+						"REPEAT": "repeat",
+						"FINDSET": "Findset()",
+						"NEXT": "Next()",
+						"GET": "Get",
+						"INSERT": "Insert()",
+						"THEN": "then",
+						"VAR": "var",
+						"NOT": "not",
+						"VALIDATE": "Validate",
+						"MODIFY": "Modify()",
+						"SETRANGE": "SetRange"
 					},
-					"description": "A list of words and their correct case. For example, {'javascript': 'JavaScript'}."
+					"description": "A list of words and their correct case. For example, {'FINDSET': 'Findset()'}."
 				}
 			}
 		},
@@ -48,7 +61,13 @@
         "command": "extension.toLowerCase",
         "key": "ctrl+alt+l",
         "when": "editorTextFocus"
-    }
+    },
+	{
+		"command": "extension.addWordToList",
+		"key": "ctrl+alt+t",
+		"when": "editorTextFocus"
+	}
+
 ]
 	},
 	"scripts": {
