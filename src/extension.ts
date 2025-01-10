@@ -34,7 +34,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Replace words in the document based on the reference list
             for (const [word, correctWord] of Object.entries(referenceList)) {
-                const regex = new RegExp(`\\b${word}\\b`, 'gi'); // Match whole words, case-insensitive
+                const regex = new RegExp(`\\b${escapeRegExp(word)}\\b`, 'g'); // Case-sensitive match
                 updatedText = updatedText.replace(regex, correctWord);
             }
 
@@ -49,21 +49,61 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     let addWordCmd = vscode.commands.registerCommand('extension.addWordToList', async () => {
-        const word = await vscode.window.showInputBox({ prompt: 'Enter the word to add (case-insensitive):' });
-        const correctCase = await vscode.window.showInputBox({ prompt: `Enter the correct case for "${word}":` });
-    
-        if (word && correctCase) {
-            const config = vscode.workspace.getConfiguration('caseCorrector');
-            const referenceList = config.get<{ [key: string]: string }>('referenceList', {});
-    
-            referenceList[word.toLowerCase()] = correctCase;
-    
-            await config.update('referenceList', referenceList, vscode.ConfigurationTarget.Global);
-            vscode.window.showInformationMessage(`Added "${word}" as "${correctCase}" to the reference list.`);
+        const editor = vscode.window.activeTextEditor;
+
+        if (!editor) {
+            vscode.window.showErrorMessage("No active editor found.");
+            return;
         }
+
+        const document = editor.document;
+        const selection = editor.selection;
+        const selectedText = document.getText(selection).trim();
+
+        if (!selectedText) {
+            vscode.window.showErrorMessage("No text selected. Please highlight a word to add.");
+            return;
+        }
+
+        // Prompt the user for the original word (case-sensitive) and the correct case
+        const originalWord = await vscode.window.showInputBox({
+            prompt: "Enter the word (case-sensitive) to add to the reference list:",
+            value: selectedText,
+        });
+
+        if (!originalWord) {
+            vscode.window.showErrorMessage("No word entered. Operation canceled.");
+            return;
+        }
+
+        const correctWord = await vscode.window.showInputBox({
+            prompt: `Enter the correct case for "${originalWord}":`,
+            value: originalWord,
+        });
+
+        if (!correctWord) {
+            vscode.window.showErrorMessage("No correct case entered. Operation canceled.");
+            return;
+        }
+
+        // Fetch the current reference list
+        const config = vscode.workspace.getConfiguration('caseCorrector');
+        const referenceList = config.get<{ [key: string]: string }>('referenceList', {});
+
+        // Add the new word to the list (case-sensitive)
+        referenceList[originalWord] = correctWord;
+
+        // Update the reference list in user settings
+        await config.update('referenceList', referenceList, vscode.ConfigurationTarget.Global);
+        vscode.window.showInformationMessage(`Added "${originalWord}" as "${correctWord}" to the reference list.`);
     });
 
     context.subscriptions.push(correctCaseCmd,toLowerCaseCmd,addWordCmd);
+}
+
+// Utility function to escape special regex characters
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function deactivate() {}
