@@ -2,7 +2,7 @@
 	"name": "HiLo-case",
 	"displayName": "HiLo-case",
 	"description": "Converts text to correct case with use of reference list.",
-	"version": "0.0.4",
+	"version": "0.0.19",
 	"publisher": "forey-apps",
 	"repository": "https://github.com/JosefFryk/ALHiLoExtension",
 	"engines": {
@@ -26,24 +26,24 @@
 				"caseCorrector.referenceList": {
 					"type": "object",
 					"default": {
-						"BEGIN": "begin", 
-						"END": "end",
-						"IF": "if",
-						"ELSE": "else",
-						"UNTIL": "until",
-						"REPEAT": "repeat",
-						"FINDSET": "Findset()",
-						"NEXT": "Next()",
-						"GET": "Get",
-						"INSERT": "Insert()",
-						"THEN": "then",
-						"VAR": "var",
-						"NOT": "not",
-						"VALIDATE": "Validate",
-						"MODIFY": "Modify()",
-						"SETRANGE": "SetRange"
+						"begin": "begin", 
+						"end": "end",
+						"if": "if",
+						"else": "else",
+						"until": "until",
+						"repeat": "repeat",
+						"FindSet()": "Findset()",
+						"Next()": "Next()",
+						"Get": "Get",
+						"Insert()": "Insert()",
+						"then": "then",
+						"var": "var",
+						"not": "not",
+						"Validate": "Validate",
+						"Modify()": "Modify()",
+						"SetRange": "SetRange"
 					},
-					"description": "A list of words and their correct case. For example, {'FINDSET': 'Findset()'}."
+					"description": "A list of words and their correct case. For example, {'FindSet()': 'Findset()'}."
 				}
 			}
 		},
@@ -91,7 +91,7 @@
 		"@types/node": "^20",
 		"@types/vscode": "^1.73.0",
 		"eslint": "^9.13.0",
-		"typescript": "^5.7.2",
-		"typescript-eslint": "^8.16.0"
+		"TypeScript": "^5.7.2",
+		"TypeScript-eslint": "^8.16.0"
 	}
 }

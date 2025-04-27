@@ -1,15 +1,15 @@
 import * as vscode from 'vscode';
 import { escapeRegExp } from '../translationUtils';
 
-export function registerTextCorrectionCommands(context: vscode.ExtensionContext) {
-    // toLowerCase
-    const toLowerCaseCmd = vscode.commands.registerCommand('extension.toLowerCase', () => {
+
+export async function toLowerCase() {
+
         const editor = vscode.window.activeTextEditor;
 
         if (editor) {
             const document = editor.document;
             const selections = editor.selections;
-
+            
             editor.edit((editBuilder) => {
                 for (const selection of selections) {
                     const text = document.getText(selection);
@@ -17,10 +17,9 @@ export function registerTextCorrectionCommands(context: vscode.ExtensionContext)
                 }
             });
         }
-    });
+}
 
-    // correctCase
-    const correctCaseCmd = vscode.commands.registerCommand('extension.correctCase', () => {
+export async function correctCase() {
         const editor = vscode.window.activeTextEditor;
 
         if (editor) {
@@ -43,10 +42,9 @@ export function registerTextCorrectionCommands(context: vscode.ExtensionContext)
                 editBuilder.replace(fullRange, updatedText);
             });
         }
-    });
+}
 
-    // addWordToList
-    const addWordCmd = vscode.commands.registerCommand('extension.addWordToList', async () => {
+export async function addWordToList() {
         const editor = vscode.window.activeTextEditor;
 
         if (!editor) {
@@ -89,7 +87,4 @@ export function registerTextCorrectionCommands(context: vscode.ExtensionContext)
 
         await config.update('referenceList', referenceList, vscode.ConfigurationTarget.Global);
         vscode.window.showInformationMessage(`Added "${originalWord}" as "${correctWord}" to the reference list.`);
-    });
-
-    context.subscriptions.push(toLowerCaseCmd, correctCaseCmd, addWordCmd);
 }
