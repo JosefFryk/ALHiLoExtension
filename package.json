@@ -2,7 +2,7 @@
 	"name": "HiLo-case",
 	"displayName": "HiLo-case",
 	"description": "Converts text to correct case with use of reference list.",
-	"version": "0.0.30",
+	"version": "0.0.32",
 	"publisher": "forey-apps",
 	"repository": "https://github.com/JosefFryk/ALHiLoExtension",
 	"engines": {
@@ -16,7 +16,7 @@
 	"contributes": {
 		"configuration": {
 			"type": "object",
-			"title": "Uppercase-Lowercase Settings",
+			"title": "Hi-Lo configuration",
 			"properties": {
 				"caseCorrector.referenceList": {
 					"type": "object",
@@ -39,7 +39,36 @@
 						"SetRange": "SetRange"
 					},
 					"description": "A list of words and their correct case. For example, {'FindSet()': 'Findset()'}."
-				}
+				},
+				"hiloTranslate.apiKey": {
+			
+					"type": "string",
+					"default": "fill-before-testing",
+					"description": "Enter your Hugging Face API Key"
+				  },
+				  "hiloTranslate.apiEndpoint": 
+				  {
+					"type": "string",
+					"default": "https://hilo-testing.openai.azure.com/",
+					"description": "The API endpoint for Hugging Face models"
+				  },
+				  "hiloTranslate.modelName": {
+
+					"type": "string",
+					"default": "gpt-4o",
+					"description": "The name of the model to use for translation"
+				  },
+				  "hiloTranslate.deployment": {
+					"type": "string",
+					"default": "gpt-4o",
+					"description": "The name of the deployment to use for translation"
+				  },
+				  "hiloTranslate.apiVersion": {
+					"type": "string",
+					"default": "2024-04-01-preview",
+					"description": "The version of the API to use"
+				  }
+				  
 			}
 		},
 		"commands": [
@@ -87,5 +116,10 @@
 		"eslint": "^9.13.0",
 		"typescript": "^5.7.2",
 		"typescript-eslint": "^8.16.0"
+	},
+	"dependencies": {
+		"axios": "^1.9.0",
+		"dotenv": "^16.5.0",
+		"fast-xml-parser": "^5.2.1"
 	}
 }

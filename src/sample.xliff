@@ -14,6 +14,12 @@
         <source>Please click the button below to continue.</source>
         <target></target>
       </trans-unit>
+        <trans-unit id="Page 2395409393 - Property 2879900210" size-unit="char" translate="yes" xml:space="preserve">
+          <source>E-shop Setup Card</source>
+          <target state="needs-translation" />
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">Page E-Shop Setup Card - Property Caption</note>
+        </trans-unit>
     </body>
   </file>
 </xliff>
