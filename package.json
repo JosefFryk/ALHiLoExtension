@@ -2,31 +2,26 @@
 	"name": "HiLo-case",
 	"displayName": "HiLo-case",
 	"description": "Converts text to correct case with use of reference list.",
-	"version": "0.0.19",
+	"version": "0.0.30",
 	"publisher": "forey-apps",
 	"repository": "https://github.com/JosefFryk/ALHiLoExtension",
 	"engines": {
 		"vscode": "^1.74.0"
 	},
-	"categories": [ 
+	"categories": [
 		"Other"
 	],
-	"activationEvents": [
-		"onCommand:extension.toLowerCase",
-		"onCommand:extension.correctCase",
-		"onCommand:extension.addWordToList",
-		"onCommand:extension.translateText"
-	],
+	"activationEvents": [],
 	"main": "./out/extension.js",
 	"contributes": {
-			"configuration": {
+		"configuration": {
 			"type": "object",
 			"title": "Uppercase-Lowercase Settings",
 			"properties": {
 				"caseCorrector.referenceList": {
 					"type": "object",
 					"default": {
-						"begin": "begin", 
+						"begin": "begin",
 						"end": "end",
 						"if": "if",
 						"else": "else",
@@ -49,8 +44,8 @@
 		},
 		"commands": [
 			{
-            "command": "extension.toLowerCase",
-            "title": "Convert to Lowercase"
+				"command": "extension.toLowerCase",
+				"title": "Convert to Lowercase"
 			},
 			{
 				"command": "extension.correctCase",
@@ -66,18 +61,17 @@
 			}
 		],
 		"keybindings": [
-    {
-        "command": "extension.toLowerCase",
-        "key": "ctrl+alt+l",
-        "when": "editorTextFocus"
-    },
-	{
-		"command": "extension.addWordToList",
-		"key": "ctrl+alt+t",
-		"when": "editorTextFocus"
-	}
-
-]
+			{
+				"command": "extension.toLowerCase",
+				"key": "ctrl+alt+l",
+				"when": "editorTextFocus"
+			},
+			{
+				"command": "extension.addWordToList",
+				"key": "ctrl+alt+t",
+				"when": "editorTextFocus"
+			}
+		]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
@@ -91,7 +85,7 @@
 		"@types/node": "^20",
 		"@types/vscode": "^1.73.0",
 		"eslint": "^9.13.0",
-		"TypeScript": "^5.7.2",
-		"TypeScript-eslint": "^8.16.0"
+		"typescript": "^5.7.2",
+		"typescript-eslint": "^8.16.0"
 	}
 }

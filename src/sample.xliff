@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2">
+  <file source-language="en" target-language="cs" datatype="plaintext" original="messages">
+    <body>
+      <trans-unit id="1">
+        <source>Hello, how are you?</source>
+        <target></target>
+      </trans-unit>
+      <trans-unit id="2">
+        <source>Today is a beautiful day.</source>
+        <target></target>
+      </trans-unit>
+      <trans-unit id="3">
+        <source>Please click the button below to continue.</source>
+        <target></target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>
