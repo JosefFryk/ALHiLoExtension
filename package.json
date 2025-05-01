@@ -2,7 +2,7 @@
 	"name": "HiLo-case",
 	"displayName": "HiLo-case",
 	"description": "Converts text to correct case with use of reference list.",
-	"version": "0.0.32",
+	"version": "0.0.34",
 	"publisher": "forey-apps",
 	"repository": "https://github.com/JosefFryk/ALHiLoExtension",
 	"engines": {
@@ -41,62 +41,86 @@
 					"description": "A list of words and their correct case. For example, {'FindSet()': 'Findset()'}."
 				},
 				"hiloTranslate.apiKey": {
-			
 					"type": "string",
-					"default": "fill-before-testing",
+					"default": "TODO:",
 					"description": "Enter your Hugging Face API Key"
-				  },
-				  "hiloTranslate.apiEndpoint": 
-				  {
+				},
+				"hiloTranslate.apiEndpoint": {
 					"type": "string",
 					"default": "https://hilo-testing.openai.azure.com/",
 					"description": "The API endpoint for Hugging Face models"
-				  },
-				  "hiloTranslate.modelName": {
-
+				},
+				"hiloTranslate.modelName": {
 					"type": "string",
 					"default": "gpt-4o",
 					"description": "The name of the model to use for translation"
-				  },
-				  "hiloTranslate.deployment": {
+				},
+				"hiloTranslate.deployment": {
 					"type": "string",
 					"default": "gpt-4o",
 					"description": "The name of the deployment to use for translation"
-				  },
-				  "hiloTranslate.apiVersion": {
+				},
+				"hiloTranslate.apiVersion": {
 					"type": "string",
 					"default": "2024-04-01-preview",
 					"description": "The version of the API to use"
-				  }
-				  
+				},
+				"hiloTranslate.uploadUrl": {
+					"type": "string",
+					"default": "TODO:",
+					"description": "The URL to upload the translation dictionary"
+				},
+				"hiloTranslate.enableUpload": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable automatic upload of translations.json to Azure Blob Storage after export."
+				},
+				"hiloTranslate.cosmosEndpoint": {
+				"type": "string",
+				"default": "TODO:",
+				"description": "The endpoint for your Azure Cosmos DB account. Replace <your-account> with your account name."
+				},
+				"hiloTranslate.cosmosKey": {
+					"type": "string",
+					"default": "TODO:",
+					"description": "The key for your Azure Cosmos DB account."
+				}
 			}
 		},
 		"commands": [
 			{
-				"command": "extension.toLowerCase",
+				"command": "textCorrection.toLowerCase",
 				"title": "Convert to Lowercase"
 			},
 			{
-				"command": "extension.correctCase",
+				"command": "textCorrection.correctCase",
 				"title": "Correct Case in Document"
 			},
 			{
-				"command": "extension.addWordToList",
+				"command": "textCorrection.addWordToList",
 				"title": "Add Word to Reference List"
 			},
 			{
-				"command": "extension.translateByAI",
+				"command": "hiloTranslator.translateByAI",
 				"title": "Translate by AI"
+			},
+			{
+				"command": "hiloTranslator.exportTranslationDictionary",
+				"title": "Export Translations from XLIFF to JSON"
+			},
+			{
+				"command": "hiloTranslator.exportTranslationToDB",
+				"title": "Export Translations to Azure Cosmos DB"
 			}
 		],
 		"keybindings": [
 			{
-				"command": "extension.toLowerCase",
+				"command": "textCorrection.toLowerCase",
 				"key": "ctrl+alt+l",
 				"when": "editorTextFocus"
 			},
 			{
-				"command": "extension.addWordToList",
+				"command": "textCorrection.addWordToList",
 				"key": "ctrl+alt+t",
 				"when": "editorTextFocus"
 			}
@@ -118,8 +142,10 @@
 		"typescript-eslint": "^8.16.0"
 	},
 	"dependencies": {
+		"@azure/cosmos": "^4.3.0",
 		"axios": "^1.9.0",
 		"dotenv": "^16.5.0",
-		"fast-xml-parser": "^5.2.1"
+		"fast-xml-parser": "^5.2.1",
+		"uuid": "^11.1.0"
 	}
 }

@@ -1,13 +1,17 @@
 import * as vscode from 'vscode';
 import { toLowerCase, addWordToList, correctCase } from './commands/textCorrectionCommands';
 import { translateTextAI } from './commands/translationCommands';
+import { exportTranslationDictionary } from './commands/exportTranslationDictionary';
+import { exportTranslationToDB } from './commands/exportTranslationToDB'
 
 export function activate(context: vscode.ExtensionContext) {
-    let toLowerCaseCmd = vscode.commands.registerCommand('extension.toLowerCase', () => toLowerCase());
-    let correctCaseCmd = vscode.commands.registerCommand('extension.correctCase', () => correctCase());
-    let addWordToListCmd = vscode.commands.registerCommand('extension.addWordToList', () => addWordToList());
-    let translateTextAICmd = vscode.commands.registerCommand('extension.translateByAI', () => translateTextAI());
+    let toLowerCaseCmd = vscode.commands.registerCommand('textCorrection.toLowerCase', () => toLowerCase());
+    let correctCaseCmd = vscode.commands.registerCommand('textCorrection.correctCase', () => correctCase());
+    let addWordToListCmd = vscode.commands.registerCommand('textCorrection.addWordToList', () => addWordToList());
+    let translateTextAICmd = vscode.commands.registerCommand('hiloTranslator.translateByAI', () => translateTextAI());
+    let exportTranslationDictionaryCmd = vscode.commands.registerCommand('hiloTranslator.exportTranslationDictionary', () => exportTranslationDictionary());
+    let exportTranslationToDBCmd = vscode.commands.registerCommand('hiloTranslator.exportTranslationToDB', () => exportTranslationToDB());
 
-    context.subscriptions.push(toLowerCaseCmd, correctCaseCmd, addWordToListCmd, translateTextAICmd);
+    context.subscriptions.push(toLowerCaseCmd, correctCaseCmd, addWordToListCmd, translateTextAICmd, exportTranslationDictionaryCmd, exportTranslationToDBCmd);
 }
 export function deactivate() {}

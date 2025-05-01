@@ -20,3 +20,4 @@ export async function translateTextAI() {
     vscode.window.showInformationMessage('XLIFF translation complete.');
   });
 }
+
