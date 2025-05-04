@@ -2,34 +2,32 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { XMLParser } from 'fast-xml-parser';
-import { CosmosClient } from '@azure/cosmos';
-import { v4 as uuidv4 } from 'uuid';
+import { CosmosClient, PartitionKeyBuilder } from '@azure/cosmos';
 
 export async function exportTranslationToDB() {
-    const sourceDatabase = await vscode.window.showQuickPick(
-        ['None', 'Microsoft', 'OurDB', 'AITranslated'],
-        { placeHolder: 'Select the source of these translations' }
-      );
-    
-      if (!sourceDatabase) return;
-    
-      let confidence = 0.7;
-      switch (sourceDatabase) {
-        case 'Microsoft':
-          confidence = 1.0;
-          break;
-        case 'OurDB':
-          confidence = 0.9;
-          break;
-        case 'AITranslated':
-          // TODO: Determine confidence dynamically or from AI model
-          confidence = 0.8;
-          break;
-        case 'None':
-        default:
-          confidence = 0.7;
-          break;
-      }
+  const translationType = await vscode.window.showQuickPick(
+    ['None', 'Microsoft', 'OurDB', 'AITranslated'],
+    { placeHolder: 'Select the translation type' }
+  );
+
+  if (!translationType) return;
+
+  let confidence = 0.7;
+  switch (translationType) {
+    case 'Microsoft':
+      confidence = 1.0;
+      break;
+    case 'OurDB':
+      confidence = 0.9;
+      break;
+    case 'AITranslated':
+      confidence = 0.8; // TODO: refine AI confidence later
+      break;
+    case 'None':
+    default:
+      confidence = 0.7;
+      break;
+  }
 
   const fileUri = await vscode.window.showOpenDialog({
     canSelectFiles: true,
@@ -45,6 +43,9 @@ export async function exportTranslationToDB() {
   try {
     const raw = fs.readFileSync(filePath, 'utf-8');
     const json = parser.parse(raw);
+
+    let sourceDatabase = json?.xliff?.file?.['@_original'] || 'Unknown';
+    sourceDatabase = sourceDatabase.trim().replace(/\s+/g, '');
 
     let units = json?.xliff?.file?.body?.['trans-unit'];
     if (!units && json?.xliff?.file?.body?.group?.['trans-unit']) {
@@ -67,65 +68,85 @@ export async function exportTranslationToDB() {
     }
 
     const client = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
-    const container = client.database('translations').container('id');
+    const dbResponse = await client.databases.createIfNotExists({ id: 'translations' });
+    const db = dbResponse.database;
 
-    try {
-        await container.read();
-      } catch (err: any) {
-        vscode.window.showErrorMessage(
-          `❌ Cosmos DB container not found. Check your database/container name in the code.\n${err.message}`
-        );
-        return;
-      }
+    const containerDef = {
+      id: sourceDatabase,
+      partitionKey: {
+        paths: ['/source']
+      },
+      PartitionKeyBuilder
+    };
 
-    let successCount = 0;
-    let skippedCount = 0;
+    const { container } = await db.containers.createIfNotExists(containerDef);
 
-    for (const unit of unitArray) {
-      const rawSource = unit.source;
-      const rawTarget = unit.target;
+    await vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: 'Exporting translations to Cosmos DB...',
+      cancellable: false
+    }, async (progress) => {
+      let successCount = 0;
+      let skippedCount = 0;
+      const total = unitArray.length;
+      let processed = 0;
 
-      const source = typeof rawSource === 'string'
-        ? rawSource.trim()
-        : typeof rawSource?.['#text'] === 'string'
-          ? rawSource['#text'].trim()
-          : '';
+      for (const unit of unitArray) {
+        const rawSource = unit.source;
+        const rawTarget = unit.target;
 
-      const target = typeof rawTarget === 'string'
-        ? rawTarget.trim()
-        : typeof rawTarget?.['#text'] === 'string'
-          ? rawTarget['#text'].trim()
-          : '';
+        const source = typeof rawSource === 'string'
+          ? rawSource.trim()
+          : typeof rawSource?.['#text'] === 'string'
+            ? rawSource['#text'].trim()
+            : '';
 
-      const state = rawTarget?.['@_state'];
+        const target = typeof rawTarget === 'string'
+          ? rawTarget.trim()
+          : typeof rawTarget?.['#text'] === 'string'
+            ? rawTarget['#text'].trim()
+            : '';
 
-      if (source && target && state === 'translated') {
-        const item = {
-          id: uuidv4(),
-          source,
-          target,
-          sourceLang: json?.xliff?.file?.['@_source-language'] || 'en',
-          targetLang: json?.xliff?.file?.['@_target-language'] || 'cs',
-          confidence,
-          sourceDatabase,
-          timestamp: new Date().toISOString()
-        };
+        const state = rawTarget?.['@_state'];
+        const xliffId = unit['@_id']?.trim();
 
-        try {
-          await container.items.create(item);
-          successCount++;
-        } catch (err: any) {
-          if (err.code === 409) {
-            skippedCount++;
-            console.warn(`⚠️ Duplicate skipped: ${source}`);
-          } else {
-            console.error(`❌ Failed to insert: ${source}`, err.message);
+        if (source && target && state === 'translated' && xliffId) {
+          try {
+            const existing = await container.items
+              .query({
+                query: 'SELECT * FROM c WHERE c.id = @id',
+                parameters: [{ name: '@id', value: xliffId }]
+              })
+              .fetchAll();
+
+            if (existing.resources.length > 0) {
+              skippedCount++;
+            } else {
+              const item = {
+                id: xliffId,
+                source,
+                target,
+                sourceLang: json?.xliff?.file?.['@_source-language'] || 'en',
+                targetLang: json?.xliff?.file?.['@_target-language'] || 'cs',
+                confidence,
+                sourceDatabase,
+                translationType,
+                timestamp: new Date().toISOString()
+              };
+              await container.items.create(item);
+              successCount++;
+            }
+          } catch (err: any) {
+            console.error(`❌ Failed to insert or check: ${source}`, err.message);
           }
         }
-      }
-    }
 
-    vscode.window.showInformationMessage(`✅ Exported ${successCount} translations. ⚠️ Skipped ${skippedCount} duplicates.`);
+        processed++;
+        progress.report({ increment: (100 / total), message: `${processed}/${total}` });
+      }
+
+      vscode.window.showInformationMessage(`✅ Exported ${successCount} translations. ⚠️ Skipped ${skippedCount} duplicates.`);
+    });
   } catch (err) {
     console.error(`Failed to parse ${filePath}:`, err);
     vscode.window.showErrorMessage('❌ Failed to export translations: ' + (err as any).message);
