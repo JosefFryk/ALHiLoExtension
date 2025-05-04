@@ -11,28 +11,26 @@ export function buildXLIFF(json: any) {
   return builder.build(json);
 }
 
-export async function translateXLIFF(path: string, translateFn: (text: string) => Promise<string>) {
+export async function translateXLIFF(path: string, translateFn: (text: string) => Promise<{ translated: string; confidence: number }>) {
   const raw = fs.readFileSync(path, 'utf-8');
   const json = parseXLIFF(raw);
 
   const units = json.xliff.file.body['trans-unit'];
 
   for (const unit of units) {
-    // If target exists and has state="needs-translation"
     if (unit.target && unit.target['@_state'] === 'needs-translation') {
       const sourceText = unit.source;
       if (sourceText) {
-        const translated = await translateFn(sourceText);
-
-        // Set target correctly
+        const { translated, confidence } = await translateFn(sourceText);
+  
         unit.target = {
           '#text': translated,
-          '@_state': 'translated'
+          '@_state': 'translated',
+          '@_confidence': confidence.toFixed(2) // store as string with 2 decimals
         };
       }
     }
   }
-
   const newXliff = buildXLIFF(json);
   fs.writeFileSync(path, newXliff, 'utf-8');
 }

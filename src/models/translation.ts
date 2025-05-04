@@ -14,7 +14,7 @@ interface AzureOptions {
 }
 
 
-const translateText = async (text: string,sourceLang: string, targetLang: string, retries = NUMBER_OF_RETRIES) : Promise<string> => {
+const translateText = async (text: string,sourceLang: string, targetLang: string, retries = NUMBER_OF_RETRIES) : Promise<{ translated: string, confidence: number }> => {
     // Get API URL and API Key from VS Code settings
     const config = vscode.workspace.getConfiguration();
     const apiKey = config.get<string>('hiloTranslate.apiKey');
@@ -54,6 +54,7 @@ try {
         ],
         max_tokens: 1000,
         temperature: 0.7,
+        logprobs: true
       },
       {
           headers: {
@@ -67,7 +68,16 @@ try {
     const rawTranslation = response.data.choices[0]?.message?.content || '';
     const cleanedTranslation = cleanTranslation(rawTranslation);
 
-    return cleanedTranslation;
+    const tokenLogProbs = response.data.choices[0]?.logprobs?.content || [];
+    const probabilities = tokenLogProbs.map((t: any) => typeof t.logprob === 'number' ? Math.exp(t.logprob) : 0);
+    const averageConfidence = probabilities.length > 0
+      ? parseFloat((probabilities.reduce((a: number, b: number) => a + b, 0) / probabilities.length).toFixed(2))
+      : 0.7;
+
+    return {
+      translated: cleanedTranslation,
+      confidence: averageConfidence
+    };
 } catch (error) {
   // Handle API errors with retries
   const errorMessage = (error as any).response?.data?.error?.message || (error as any).message;

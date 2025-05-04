@@ -17,7 +17,7 @@ export async function translateTextAI() {
     cancellable: false,
   }, async () => {
     await translateXLIFF(file.fileName, (text) => translateText(text, 'en', 'cs'));
-    vscode.window.showInformationMessage('XLIFF translation complete.');
+    vscode.window.showInformationMessage('✅ XLIFF translation complete.');
   });
 }
 

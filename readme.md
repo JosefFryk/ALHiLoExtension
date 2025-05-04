@@ -34,7 +34,7 @@ This extension provides AI-powered and database-assisted translation tools for B
 * [ ] 🛡️ Optional encryption or secure storage of keys
 * [ ] 🌍 Add language support toggle in settings
 * [ ] 🖊️ **Translate only user-selected text** instead of entire file  
-* [ ] 🧮 **Add `confidence` attribute to translated `<target>` tags** based on AI or DB value
+* [x] 🧮 **Add `confidence` attribute to translated `<target>` tags** based on AI or DB value
 ---
 
 ## 🔧 Configuration Settings (`package.json`)
