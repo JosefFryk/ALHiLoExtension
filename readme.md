@@ -24,10 +24,10 @@ This extension provides AI-powered and database-assisted translation tools for B
 
 ## 🔜 Roadmap
 
-* [ ] 🔄 **Pre-fill translations** from Cosmos DB before sending to AI
-* [ ] 📉 **Estimate token/cost usage** when translating via Azure OpenAI
+* [x] 🔄 **Pre-fill translations** from Cosmos DB before sending to AI
+* [x] 📉 **Estimate token/cost usage** when translating via Azure OpenAI
 * [ ] 💬 Add **confidence scoring & fallback logic** for AI-generated translations
-* [ ] 🔍 Add **search command** to lookup existing translations
+* [x] 🔍 Add **search command** to lookup existing translations
 * [ ] 🧪 Add **dry-run/test mode** for exports
 * [ ] 📥 **Backfill database** from legacy `.xliff` files
 * [ ] 📦 Export translations from DB back into `.xliff` format
