@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { translateXLIFF } from '../xliff/xliff-handler';
 import { translateText } from '../models/translation';
+import { showUsageLog } from '../models/usageLoger';
 
 export async function translateTextAI() {
   console.log('Translation command triggered');
@@ -16,8 +17,11 @@ export async function translateTextAI() {
     title: 'Translating XLIFF...',
     cancellable: false,
   }, async () => {
-    await translateXLIFF(file.fileName, (text) => translateText(text, 'en', 'cs'));
-    vscode.window.showInformationMessage('✅ XLIFF translation complete.');
+    await translateXLIFF(file.fileName, (text) => translateText(text, 'en-US', 'cs-CZ'));
   });
-}
 
+  const result = await vscode.window.showInformationMessage('✅ XLIFF translation complete.', 'Show Usage');
+  if (result === 'Show Usage') {
+    showUsageLog();
+  }
+}
