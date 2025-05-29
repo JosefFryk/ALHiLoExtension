@@ -2,7 +2,7 @@
 	"name": "HiLo-case",
 	"displayName": "HiLo-case",
 	"description": "Converts text to correct case with use of reference list.",
-	"version": "0.0.36",
+	"version": "0.1.0",
 	"publisher": "forey-apps",
 	"repository": "https://github.com/JosefFryk/ALHiLoExtension",
 	"engines": {
@@ -39,6 +39,51 @@
 						"SetRange": "SetRange"
 					},
 					"description": "A list of words and their correct case. For example, {'FindSet()': 'Findset()'}."
+				},
+				"hiloTranslate.apiKey": {
+					"type": "string",
+					"default": "",
+					"description": "Enter your Hugging Face API Key"
+				},
+				"hiloTranslate.apiEndpoint": {
+					"type": "string",
+					"default": "",
+					"description": "The API endpoint for Hugging Face models"
+				},
+				"hiloTranslate.modelName": {
+					"type": "string",
+					"default": "gpt-4o",
+					"description": "The name of the model to use for translation"
+				},
+				"hiloTranslate.deployment": {
+					"type": "string",
+					"default": "gpt-4o",
+					"description": "The name of the deployment to use for translation"
+				},
+				"hiloTranslate.apiVersion": {
+					"type": "string",
+					"default": "2024-04-01-preview",
+					"description": "The version of the API to use"
+				},
+				"hiloTranslate.uploadUrl": {
+					"type": "string",
+					"default": "",
+					"description": "The URL to upload the translation dictionary"
+				},
+				"hiloTranslate.enableUpload": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable automatic upload of translations.json to Azure Blob Storage after export."
+				},
+				"hiloTranslate.cosmosEndpoint": {
+				"type": "string",
+				"default": "",
+				"description": "The endpoint for your Azure Cosmos DB account. Replace <your-account> with your account name."
+				},
+				"hiloTranslate.cosmosKey": {
+					"type": "string",
+					"default": "",
+					"description": "The key for your Azure Cosmos DB account."
 				}
 			}
 		},
@@ -66,6 +111,10 @@
 			{
 				"command": "hiloTranslator.exportTranslationToDB",
 				"title": "Export Translations to Azure Cosmos DB"
+			},
+			{
+				"command": "hiloTranslator.translateSelection",
+				"title": "Translate Selected Text with AI"
 			}
 		],
 		"keybindings": [
@@ -78,6 +127,11 @@
 				"command": "textCorrection.addWordToList",
 				"key": "ctrl+alt+t",
 				"when": "editorTextFocus"
+			},
+			{
+				"command": "hiloTranslator.translateSelection",
+				"key": "alt+r",
+				"when": "editorLangId == xml"
 			}
 		]
 	},

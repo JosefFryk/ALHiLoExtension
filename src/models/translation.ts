@@ -19,8 +19,9 @@ const translateText = async (
   text: string,
   sourceLang: string,
   targetLang: string,
+  numOptions = 1,
   retries = NUMBER_OF_RETRIES
-): Promise<{ translated: string, confidence: number, source: string }> => {
+): Promise<{ translated: string, confidence: number, source: string }[]> => {
   const config = vscode.workspace.getConfiguration();
   const apiKey = config.get<string>('hiloTranslate.apiKey');
   const apiEndpoint = config.get<string>('hiloTranslate.apiEndpoint');
@@ -39,21 +40,21 @@ const translateText = async (
   const cached = await lookupTranslation(text, sourceLang);
   if (cached?.translated) {
     logAiUsage('[CACHE] Found in Cosmos DB', text, cached.translated, undefined);
-    return { translated: cached.translated, confidence: cached.confidence, source: 'cosmos' };
+    return [{ translated: cached.translated, confidence: cached.confidence, source: 'cosmos' }];
   }
 
   interface TranslationExample {
     source: string;
     target: string;
   }
-  
+
   const examplesText = cached?.examples?.length
       ? cached.examples.map((e: TranslationExample) => `- ${e.source} → ${e.target}`).join('\n')
       : '';
 
   const promptHeader = `You are a professional Business Central translator. Only return the translated text in plain language. Do not add quotation marks, markdown, asterisks, or any explanation. Reply ONLY with the pure translation text.`;
   const promptExamples = examplesText ? `Here are some previous translations for context:\n${examplesText}\n\n` : '';
-  const promptRequest = `Translate the following text from ${sourceLang} to ${targetLang}:\n\n"${text}"`;
+  const promptRequest = `Translate the following text from ${sourceLang} to ${targetLang} and provide ${numOptions} translation options:\n\n"${text}"`;
 
   const options: AzureOptions = {
     apiKey,
@@ -71,8 +72,8 @@ const translateText = async (
           { role: "user", content: promptExamples + promptRequest }
         ],
         max_tokens: 1000,
-        temperature: 0.7,
-        logprobs: true
+        temperature: 0.7
+        // n: numOptions
       },
       {
         headers: {
@@ -82,13 +83,16 @@ const translateText = async (
       }
     );
 
-    const rawTranslation = response.data.choices[0]?.message?.content || '';
-    const cleanedTranslation = cleanTranslation(rawTranslation);
+    
 
-    const tokenLogProbs = response.data.choices[0]?.logprobs?.content || [];
-    const probabilities = tokenLogProbs.map((t: any) => typeof t.logprob === 'number' ? Math.exp(t.logprob) : 0);
+    const results = (response.data.choices as { message?: { content: string } }[]).map((choice) => {
+      const rawTranslation = choice.message?.content || '';
+      const cleanedTranslation = cleanTranslation(rawTranslation);
 
-    const avgProb = probabilities.length > 0
+      const tokenLogProbs = response.data.choices[0]?.logprobs?.content || [];
+      const probabilities = tokenLogProbs.map((t: any) => typeof t.logprob === 'number' ? Math.exp(t.logprob) : 0);
+
+      const avgProb = probabilities.length > 0
       ? probabilities.reduce((a: number, b: number) => a + b, 0) / probabilities.length
       : 0.7;
 
@@ -96,26 +100,30 @@ const translateText = async (
       ? Math.min(...probabilities)
       : 0.7;
 
-    const combinedConfidence = parseFloat(((avgProb * 0.7) + (minProb * 0.3)).toFixed(2));
+      const combinedConfidence = parseFloat(((avgProb * 0.7) + (minProb * 0.3)).toFixed(2));
+      
+      return {
+        translated: cleanedTranslation,
+        confidence: combinedConfidence, 
+        source: 'aiTranslator'
+      };
+    });
 
-    logAiUsage('Azure AI translation', text, cleanedTranslation, response.data.usage);
+    logAiUsage('Azure AI translation', text, results.map((r: { translated: string }) => r.translated).join(' | '), response.data.usage);
 
-    return {
-      translated: cleanedTranslation,
-      confidence: combinedConfidence,
-      source: 'aiTranslator'
-    };
+    return results;
 
   } catch (error) {
     const errorMessage = (error as any).response?.data?.error?.message || (error as any).message;
     if (retries > 0 && errorMessage.includes('model loading')) {
       console.log("Model is loading, retrying in 5 seconds...");
       await new Promise(resolve => setTimeout(resolve, TIMEOUT));
-      return translateText(text, sourceLang, targetLang, retries - 1);
+      return translateText(text, sourceLang, targetLang, numOptions, retries - 1);
     }
     throw new Error(`Translation failed: ${errorMessage}`);
   }
 };
+
 
 function cleanTranslation(text: string): string {
   return text

@@ -20,6 +20,18 @@
         <note from="Developer" annotates="general" priority="2"/>
         <note from="Xliff Generator" annotates="general" priority="3">Page E-Shop Setup Card - Property Caption</note>
       </trans-unit>
+              <trans-unit id="Table 802142460 - Field 883711285 - Property 2879900210" size-unit="char" translate="yes" xml:space="preserve">
+          <source>Entry No.</source>
+          <target state="needs-translation" />
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">Table BarCodeEntry - Field Entry No. - Property Caption</note>
+        </trans-unit>
+        <trans-unit id="TableExtension 3664586602 - Field 3243319026 - Property 1295455071" size-unit="char" translate="yes" xml:space="preserve" al-object-target="Table 2574427010">
+          <source>FC Unit Price</source>
+          <target state="needs-translation" />
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">TableExtension SalesLineInvt - Field FC Unit Price - Property ToolTip</note>
+        </trans-unit>
     </body>
   </file>
 </xliff>
