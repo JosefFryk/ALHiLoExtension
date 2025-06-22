@@ -35,6 +35,7 @@ This extension provides AI-powered and database-assisted translation tools for B
 * [ ] 🌍 Add language support toggle in settings
 * [ ] 🖊️ **Translate only user-selected text** instead of entire file  
 * [x] 🧮 **Add `confidence` attribute to translated `<target>` tags** based on AI or DB value
+* [ ]   **Implement Memento to help user to enter keys
 ---
 
 ## 🔧 Configuration Settings (`package.json`)

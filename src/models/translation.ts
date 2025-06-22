@@ -72,7 +72,8 @@ const translateText = async (
           { role: "user", content: promptExamples + promptRequest }
         ],
         max_tokens: 1000,
-        temperature: 0.7
+        temperature: 0.7,
+        logprobs: true
         // n: numOptions
       },
       {

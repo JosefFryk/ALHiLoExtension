@@ -14,8 +14,8 @@ async function replaceBlock(editor: vscode.TextEditor, block: string, start: num
   await editor.document.save();
 }
 
-function updateTargetInBlock(block: string, translated: string, confidence: number): string {
-  const targetTag = `<target state="translated" confidence="${confidence.toFixed(2)}">${translated}</target>`;
+function updateTargetInBlock(block: string, translated: string, confidence: number, source:string): string {
+  const targetTag = `<target state="translated" confidence="${confidence.toFixed(2)}" translationSource="${source}">${translated}</target>`;
   
   // Check if the block contains a self-closing target tag
   if (block.match(/<target[^>]*\/>/)) {
@@ -66,7 +66,7 @@ async function translateAndLog(file: vscode.TextDocument, sourceLang: string, ta
   }, async () => {
     await translateXLIFF(file.fileName, async (text) => {
       const result = await translateText(text, sourceLang, targetLang, numOptions);
-      return result.length > 0 ? result[0] : { translated: '', confidence: 0 };
+      return result.length > 0 ? result[0] : { translated: '', confidence: 0, source: 'unknown' };
     });
   });
 
@@ -111,14 +111,14 @@ vscode.window.showQuickPick(['Get AI Translate'], { placeHolder: placeholder }).
 
     const options = splitTranslations.map((t, index) => ({
       label: t,
-      description: `Confidence: ${(translations[0].confidence * 100).toFixed(2)}%`
+      description: `Confidence: ${(translations[0].confidence * 100).toFixed(2)}% • Source: ${translations[0].source}`
     }));
 
     vscode.window.showQuickPick(options, {
       placeHolder: 'Select the best translation'
     }).then(async (finalChoice) => {
       if (finalChoice) {
-        const updatedBlock = updateTargetInBlock(transUnit.block, finalChoice.label, translations[0].confidence);
+        const updatedBlock = updateTargetInBlock(transUnit.block, finalChoice.label, translations[0].confidence,translations[0].source);
         await replaceBlock(editor, transUnit.block, transUnit.start, transUnit.end, updatedBlock);
         vscode.window.showInformationMessage(`Translation inserted: ${finalChoice.label}`);
       }
@@ -141,5 +141,3 @@ export async function translateTextAI() {
   const { sourceLang, targetLang } = await getLanguagesFromFile(file);
   await translateAndLog(file, sourceLang, targetLang);
 }
-
-//todo spatne vybira segment kam vklada
