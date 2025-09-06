@@ -11,7 +11,9 @@ export function logCosmosUsage(context: string, ru: number | string) {
   output.appendLine(`[COSMOS] ${context} — RU charge: ${numericRU}`);
 }
 
-export function logAiUsage(context: string, text: string, translated: string, usage?: { prompt_tokens: number, completion_tokens: number, total_tokens: number }) {
+export function logAiUsage(context: string, text: string, translated: string, usage?: { prompt_tokens: number, completion_tokens: number, total_tokens: number }, prompt?: string) {
+  const config = vscode.workspace.getConfiguration();
+  const logPrompt = config.get<boolean>('hiloTranslate.debugPrompt') || false;
   output.appendLine(`[AI] ${context}`);
   output.appendLine(`     Input: "${text}"`);
   output.appendLine(`     Output: "${translated}"`);
@@ -20,6 +22,12 @@ export function logAiUsage(context: string, text: string, translated: string, us
     output.appendLine(`     Tokens: ${usage.total_tokens} (Prompt: ${usage.prompt_tokens}, Completion: ${usage.completion_tokens})`);
   } else {
     output.appendLine('     Tokens: not reported');
+  }
+
+    if (logPrompt && prompt) {
+    output.appendLine('\n--- Prompt Sent ---');
+    output.appendLine(prompt);
+    output.appendLine('-------------------\n');
   }
 }
 

@@ -85,6 +85,7 @@ export async function translateSelectionCommand() {
   const position = editor.selection.start;
   const documentText = editor.document.getText();
   const offset = editor.document.offsetAt(position);
+  const { sourceLang, targetLang } = await extractLanguagesFromXLIFF(documentText);
 
   const transUnit = findTransUnitBlock(documentText, offset);
   if (!transUnit) {
@@ -104,7 +105,7 @@ export async function translateSelectionCommand() {
 
 vscode.window.showQuickPick(['Get AI Translate'], { placeHolder: placeholder }).then(async (choice) => {
   if (choice) {
-    const translations = await translateText(sourceText, 'en-US', 'cs-CZ',2);
+    const translations = await translateText(sourceText, sourceLang, targetLang,2);
 
     // Split the translated string by newline or other delimiters
     const splitTranslations = translations[0].translated.split(/\n|\|/).map(str => str.trim()).filter(str => str);
@@ -127,8 +128,6 @@ vscode.window.showQuickPick(['Get AI Translate'], { placeHolder: placeholder }).
 });
 }
  
-
-
 export async function translateTextAI() {
   console.log('Translation command triggered');
   const file = vscode.window.activeTextEditor?.document;

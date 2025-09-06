@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { XMLParser } from 'fast-xml-parser';
-import { CosmosClient, PartitionKeyBuilder } from '@azure/cosmos';
+import { CosmosClient } from '@azure/cosmos';
 
 export async function exportTranslationToDB() {
   const translationType = await vscode.window.showQuickPick(
@@ -75,8 +75,7 @@ export async function exportTranslationToDB() {
       id: sourceDatabase,
       partitionKey: {
         paths: ['/source']
-      },
-      PartitionKeyBuilder
+      }
     };
 
     const { container } = await db.containers.createIfNotExists(containerDef);
