@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { XMLParser } from 'fast-xml-parser';
 import axios from 'axios';
+import { getUploadUrl } from '../setup/configurationManager';
 
 function buildBlobUrl(uploadUrl: string, fileName: string): string {
   const [baseUrl, sasParams] = uploadUrl.split('?');
@@ -48,16 +49,16 @@ export async function exportTranslationDictionary() {
       const rawTarget = unit.target;
 
       const source = typeof rawSource === 'string'
-      ? rawSource.trim()
-      : typeof rawSource?.['#text'] === 'string'
-        ? rawSource['#text'].trim()
-        : '';
-    
-    const target = typeof rawTarget === 'string'
-      ? rawTarget.trim()
-      : typeof rawTarget?.['#text'] === 'string'
-        ? rawTarget['#text'].trim()
-        : '';
+        ? rawSource.trim()
+        : typeof rawSource?.['#text'] === 'string'
+          ? rawSource['#text'].trim()
+          : '';
+
+      const target = typeof rawTarget === 'string'
+        ? rawTarget.trim()
+        : typeof rawTarget?.['#text'] === 'string'
+          ? rawTarget['#text'].trim()
+          : '';
 
       const state = rawTarget?.['@_state'];
 
@@ -76,10 +77,11 @@ export async function exportTranslationDictionary() {
     }
 
     fs.writeFileSync(outputPath, JSON.stringify(resultObj, null, 2), 'utf-8');
-    vscode.window.showInformationMessage(`✅ Exported ${translationMap.size} translations to ${outputFileName}`);
+    vscode.window.showInformationMessage(`Exported ${translationMap.size} translations to ${outputFileName}`);
 
+    // Get upload URL from SecretStorage
+    const uploadUrl = await getUploadUrl();
     const config = vscode.workspace.getConfiguration();
-    const uploadUrl = config.get<string>('hiloTranslate.uploadUrl');
     const enableUpload = config.get<boolean>('hiloTranslate.enableUpload', true);
 
     if (enableUpload && uploadUrl) {
@@ -99,17 +101,20 @@ export async function exportTranslationDictionary() {
           });
 
           if (res.status >= 200 && res.status < 300) {
-            vscode.window.showInformationMessage(`✅ Uploaded ${outputFileName} to Azure Blob Storage.`);
+            vscode.window.showInformationMessage(`Uploaded ${outputFileName} to Azure Blob Storage.`);
           } else {
-            vscode.window.showErrorMessage(`❌ Upload failed with status ${res.status}`);
+            vscode.window.showErrorMessage(`Upload failed with status ${res.status}`);
           }
-        } catch (err: any) {
-          vscode.window.showErrorMessage('❌ Failed to upload: ' + (err.response?.data?.message || err.message));
+        } catch (err) {
+          const axiosError = err as { response?: { data?: { message?: string } }, message?: string };
+          const errorMessage = axiosError.response?.data?.message || axiosError.message || 'Unknown error';
+          vscode.window.showErrorMessage('Failed to upload: ' + errorMessage);
         }
       }
     }
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error(`Failed to parse ${filePath}:`, err);
-    vscode.window.showErrorMessage('❌ Failed to export translations: ' + (err as any).message);
+    vscode.window.showErrorMessage('Failed to export translations: ' + errorMessage);
   }
 }

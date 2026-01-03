@@ -1,10 +1,23 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
 import { XMLParser } from 'fast-xml-parser';
 import { CosmosClient } from '@azure/cosmos';
+import { getCosmosConfig, isCosmosConfigured } from '../setup/configurationManager';
 
 export async function exportTranslationToDB() {
+  // Check if Cosmos DB is configured
+  const isConfigured = await isCosmosConfigured();
+  if (!isConfigured) {
+    const action = await vscode.window.showErrorMessage(
+      'Cosmos DB is not configured. Please run setup first.',
+      'Setup Now'
+    );
+    if (action === 'Setup Now') {
+      await vscode.commands.executeCommand('hiloTranslator.setup');
+    }
+    return;
+  }
+
   const translationType = await vscode.window.showQuickPick(
     ['None', 'Microsoft', 'OurDB', 'AITranslated'],
     { placeHolder: 'Select the translation type' }
@@ -21,7 +34,7 @@ export async function exportTranslationToDB() {
       confidence = 0.9;
       break;
     case 'AITranslated':
-      confidence = 0.8; // TODO: refine AI confidence later
+      confidence = 0.8;
       break;
     case 'None':
     default:
@@ -58,16 +71,14 @@ export async function exportTranslationToDB() {
       return;
     }
 
-    const config = vscode.workspace.getConfiguration();
-    const cosmosEndpoint = config.get<string>('hiloTranslate.cosmosEndpoint');
-    const cosmosKey = config.get<string>('hiloTranslate.cosmosKey');
-
-    if (!cosmosEndpoint || !cosmosKey) {
-      vscode.window.showErrorMessage('Cosmos DB endpoint or key is not configured.');
+    // Get Cosmos config from SecretStorage
+    const cosmosConfig = await getCosmosConfig();
+    if (!cosmosConfig) {
+      vscode.window.showErrorMessage('Failed to retrieve Cosmos DB configuration.');
       return;
     }
 
-    const client = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
+    const client = new CosmosClient({ endpoint: cosmosConfig.endpoint, key: cosmosConfig.key });
     const dbResponse = await client.databases.createIfNotExists({ id: 'translations' });
     const db = dbResponse.database;
 
@@ -135,8 +146,9 @@ export async function exportTranslationToDB() {
               await container.items.create(item);
               successCount++;
             }
-          } catch (err: any) {
-            console.error(`❌ Failed to insert or check: ${source}`, err.message);
+          } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            console.error(`Failed to insert or check: ${source}`, errorMessage);
           }
         }
 
@@ -144,10 +156,11 @@ export async function exportTranslationToDB() {
         progress.report({ increment: (100 / total), message: `${processed}/${total}` });
       }
 
-      vscode.window.showInformationMessage(`✅ Exported ${successCount} translations. ⚠️ Skipped ${skippedCount} duplicates.`);
+      vscode.window.showInformationMessage(`Exported ${successCount} translations. Skipped ${skippedCount} duplicates.`);
     });
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error(`Failed to parse ${filePath}:`, err);
-    vscode.window.showErrorMessage('❌ Failed to export translations: ' + (err as any).message);
+    vscode.window.showErrorMessage('Failed to export translations: ' + errorMessage);
   }
 }

@@ -1,33 +1,57 @@
 import { CosmosClient } from '@azure/cosmos';
-import * as vscode from 'vscode';
 import { logCosmosUsage } from '../models/usageLoger';
+import { getCosmosConfig, isCosmosConfigured } from '../setup/configurationManager';
 
-const getCosmosClient = () => {
-  const config = vscode.workspace.getConfiguration();
-  const cosmosEndpoint = config.get<string>('hiloTranslate.cosmosEndpoint');
-  const cosmosKey = config.get<string>('hiloTranslate.cosmosKey');
+let cosmosClient: CosmosClient | null = null;
 
-  if (!cosmosEndpoint || !cosmosKey) {
-    throw new Error('Cosmos DB configuration is missing.');
+const getCosmosClient = async (): Promise<CosmosClient | null> => {
+  // Check if Cosmos is configured
+  const isConfigured = await isCosmosConfigured();
+  if (!isConfigured) {
+    return null;
   }
 
-  return new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
+  // Return cached client if available
+  if (cosmosClient) {
+    return cosmosClient;
+  }
+
+  // Get configuration from SecretStorage
+  const config = await getCosmosConfig();
+  if (!config) {
+    return null;
+  }
+
+  cosmosClient = new CosmosClient({ endpoint: config.endpoint, key: config.key });
+  return cosmosClient;
 };
+
+/**
+ * Reset the cached Cosmos client (useful when configuration changes)
+ */
+export function resetCosmosClient(): void {
+  cosmosClient = null;
+}
 
 // Exact match query — returns single translation
 export async function lookupExactTranslation(source: string, sourceLang: string): Promise<{ translated: string, confidence: number } | null> {
-  const client = getCosmosClient();
+  const client = await getCosmosClient();
+  if (!client) {
+    // Cosmos DB not configured, skip lookup
+    return null;
+  }
+
   const db = client.database('translations');
   const { resources: containers } = await db.containers.readAll().fetchAll();
-  
+
   let bestMatch: { translated: string, confidence: number } | null = null;
 
   for (const containerDef of containers) {
     const container = db.container(containerDef.id);
 
     const query = {
-      query: `SELECT TOP 1 c.source, c.target, c.confidence 
-              FROM c 
+      query: `SELECT TOP 1 c.source, c.target, c.confidence
+              FROM c
               WHERE c.source = @source AND c.sourceLang = @sourceLang
               ORDER BY c.confidence DESC`,
       parameters: [
@@ -49,8 +73,9 @@ export async function lookupExactTranslation(source: string, sourceLang: string)
           };
         }
       }
-    } catch (err: any) {
-      console.warn(`Exact match query failed in '${containerDef.id}': ${err.message}`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.warn(`Exact match query failed in '${containerDef.id}': ${errorMessage}`);
     }
   }
 
@@ -59,7 +84,12 @@ export async function lookupExactTranslation(source: string, sourceLang: string)
 
 // Fuzzy partial match — used for enrichment / low-confidence back-checking
 export async function lookupFuzzyExamples(source: string, sourceLang: string): Promise<{ source: string, target: string }[]> {
-  const client = getCosmosClient();
+  const client = await getCosmosClient();
+  if (!client) {
+    // Cosmos DB not configured, return empty array
+    return [];
+  }
+
   const db = client.database('translations');
   const { resources: containers } = await db.containers.readAll().fetchAll();
 
@@ -96,11 +126,12 @@ export async function lookupFuzzyExamples(source: string, sourceLang: string): P
         );
 
         for (const item of response.resources) {
-          const confidence = parseFloat((item.confidence || 0.9).toFixed(2)); 
+          const confidence = parseFloat((item.confidence || 0.9).toFixed(2));
           wordExamples.push({ source: item.source, target: item.target, confidence });
         }
       } catch (err) {
-        console.warn(`Fuzzy match query failed in '${containerDef.id}' for word "${word}": ${err instanceof Error ? err.message : 'Unknown error'}`);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        console.warn(`Fuzzy match query failed in '${containerDef.id}' for word "${word}": ${errorMessage}`);
       }
     }
 

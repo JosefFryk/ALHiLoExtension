@@ -22,15 +22,33 @@
       </trans-unit>
               <trans-unit id="Table 802142460 - Field 883711285 - Property 2879900210" size-unit="char" translate="yes" xml:space="preserve">
           <source>Entry No.</source>
-          <target state="needs-translation" />
+          <target state="translated" confidence="1.00" translationSource="cosmos">Číslo položky</target>
           <note from="Developer" annotates="general" priority="2"></note>
           <note from="Xliff Generator" annotates="general" priority="3">Table BarCodeEntry - Field Entry No. - Property Caption</note>
         </trans-unit>
         <trans-unit id="TableExtension 3664586602 - Field 3243319026 - Property 1295455071" size-unit="char" translate="yes" xml:space="preserve" al-object-target="Table 2574427010">
           <source>FC Unit Price</source>
+          <target state="translated" confidence="0.90" translationSource="cosmos">Jednotková cena NP</target>
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">TableExtension SalesLineInvt - Field FC Unit Price - Property ToolTip</note>
+        </trans-unit>
+        <trans-unit id="TableExtension 3664586602 - Field 3243319026 - Property 1295455071" size-unit="char" translate="yes" xml:space="preserve" al-object-target="Table 2574427010">
+          <source></source>
           <target state="needs-translation" />
           <note from="Developer" annotates="general" priority="2"></note>
           <note from="Xliff Generator" annotates="general" priority="3">TableExtension SalesLineInvt - Field FC Unit Price - Property ToolTip</note>
+        </trans-unit>
+          <trans-unit id="Table 2980925573 - Field 460889064 - Method 2126772001 - NamedType 3804341259" size-unit="char" translate="yes" xml:space="preserve">
+          <source>%1 must be before %2.</source>
+          <target state="needs-translation" />
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">Table Item Campaign - Field Starting Date - Method OnValidate - NamedType Text01Err</note>
+        </trans-unit>
+        <trans-unit id="Table 2282804357 - Property 2879900210" size-unit="char" translate="yes" xml:space="preserve">
+          <source>Outlet Document Header</source>
+          <target state="translated">Hlavička dokladu prodejny</target>
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">Table Outlet Document Header - Property Caption</note>
         </trans-unit>
     </body>
   </file>
