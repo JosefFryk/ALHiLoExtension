@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+  <file datatype="xml" source-language="en-US" target-language="cs-CZ" original="TestApp">
+    <body>
+      <group id="Page123">
+        <trans-unit id="Page123-Property1" translate="yes">
+          <source>E-shop Setup Card</source>
+          <target state="needs-translation"></target>
+          <note from="Developer">This is a test translation unit</note>
+        </trans-unit>
+        <trans-unit id="Page123-Property2" translate="yes">
+          <source>Customer Name</source>
+          <target state="translated">Jméno zákazníka</target>
+          <note from="Developer">Already translated</note>
+        </trans-unit>
+        <trans-unit id="Page123-Property3" translate="yes">
+          <source>Save &amp; Close</source>
+          <target state="needs-translation"></target>
+          <note from="Developer">Contains XML entity</note>
+        </trans-unit>
+      </group>
+    </body>
+  </file>
+</xliff>

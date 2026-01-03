@@ -1,0 +1,30 @@
+# Development files
+.vscode/**
+.vscode-test/**
+src/**
+tests/**
+translationsa/**
+
+# Config files
+.env
+.gitignore
+tsconfig.json
+eslint.config.mjs
+jest.config.js
+
+# Build artifacts
+*.vsix
+
+# Note: node_modules is NOT excluded so vsce includes production dependencies
+
+# Documentation source (keep README.md)
+CONTRIBUTING.md
+
+# Git
+.git/**
+.gitattributes
+
+# Misc
+*.map
+.DS_Store
+Thumbs.db

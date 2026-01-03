@@ -3,16 +3,40 @@ import { toLowerCase, addWordToList, correctCase } from './commands/textCorrecti
 import { translateTextAI, translateSelectionCommand } from './commands/translationCommands';
 import { exportTranslationDictionary } from './commands/exportTranslationDictionary';
 import { exportTranslationToDB } from './commands/exportTranslationToDB';
+import { initConfigManager } from './setup/configurationManager';
+import { runSetupCommand, checkFirstRunSetup, showConfigStatus } from './setup/setupCommand';
 
 export function activate(context: vscode.ExtensionContext) {
-    let toLowerCaseCmd = vscode.commands.registerCommand('textCorrection.toLowerCase', () => toLowerCase());
-    let correctCaseCmd = vscode.commands.registerCommand('textCorrection.correctCase', () => correctCase());
-    let addWordToListCmd = vscode.commands.registerCommand('textCorrection.addWordToList', () => addWordToList());
-    let translateTextAICmd = vscode.commands.registerCommand('hiloTranslator.translateByAI', () => translateTextAI());
-    let exportTranslationDictionaryCmd = vscode.commands.registerCommand('hiloTranslator.exportTranslationDictionary', () => exportTranslationDictionary());
-    let exportTranslationToDBCmd = vscode.commands.registerCommand('hiloTranslator.exportTranslationToDB', () => exportTranslationToDB());
-    let translateSelectionCmd = vscode.commands.registerCommand('hiloTranslator.translateSelection', () => translateSelectionCommand());
+    // Initialize the configuration manager with SecretStorage
+    initConfigManager(context);
 
-    context.subscriptions.push(toLowerCaseCmd, correctCaseCmd, addWordToListCmd, translateTextAICmd, exportTranslationDictionaryCmd, exportTranslationToDBCmd, translateSelectionCmd);
+    // Register commands
+    const toLowerCaseCmd = vscode.commands.registerCommand('textCorrection.toLowerCase', () => toLowerCase());
+    const correctCaseCmd = vscode.commands.registerCommand('textCorrection.correctCase', () => correctCase());
+    const addWordToListCmd = vscode.commands.registerCommand('textCorrection.addWordToList', () => addWordToList());
+    const translateTextAICmd = vscode.commands.registerCommand('hiloTranslator.translateByAI', () => translateTextAI());
+    const exportTranslationDictionaryCmd = vscode.commands.registerCommand('hiloTranslator.exportTranslationDictionary', () => exportTranslationDictionary());
+    const exportTranslationToDBCmd = vscode.commands.registerCommand('hiloTranslator.exportTranslationToDB', () => exportTranslationToDB());
+    const translateSelectionCmd = vscode.commands.registerCommand('hiloTranslator.translateSelection', () => translateSelectionCommand());
+
+    // Setup commands
+    const setupCmd = vscode.commands.registerCommand('hiloTranslator.setup', () => runSetupCommand());
+    const configStatusCmd = vscode.commands.registerCommand('hiloTranslator.configStatus', () => showConfigStatus());
+
+    context.subscriptions.push(
+        toLowerCaseCmd,
+        correctCaseCmd,
+        addWordToListCmd,
+        translateTextAICmd,
+        exportTranslationDictionaryCmd,
+        exportTranslationToDBCmd,
+        translateSelectionCmd,
+        setupCmd,
+        configStatusCmd
+    );
+
+    // Check if first-run setup is needed (async, non-blocking)
+    checkFirstRunSetup();
 }
+
 export function deactivate() {}

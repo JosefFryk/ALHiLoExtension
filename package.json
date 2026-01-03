@@ -2,7 +2,7 @@
 	"name": "HiLo-case",
 	"displayName": "HiLo-case",
 	"description": "Converts text to correct case with use of reference list.",
-	"version": "0.1.4",
+	"version": "0.1.14",
 	"publisher": "forey-apps",
 	"repository": "https://github.com/JosefFryk/ALHiLoExtension",
 	"engines": {
@@ -40,50 +40,10 @@
 					},
 					"description": "A list of words and their correct case. For example, {'FindSet()': 'Findset()'}."
 				},
-				"hiloTranslate.apiKey": {
-					"type": "string",
-					"default": "",
-					"description": "Enter your Hugging Face API Key"
-				},
-				"hiloTranslate.apiEndpoint": {
-					"type": "string",
-					"default": "",
-					"description": "The API endpoint for Hugging Face models"
-				},
-				"hiloTranslate.modelName": {
-					"type": "string",
-					"default": "gpt-4o",
-					"description": "The name of the model to use for translation"
-				},
-				"hiloTranslate.deployment": {
-					"type": "string",
-					"default": "gpt-4o",
-					"description": "The name of the deployment to use for translation"
-				},
-				"hiloTranslate.apiVersion": {
-					"type": "string",
-					"default": "2024-04-01-preview",
-					"description": "The version of the API to use"
-				},
-				"hiloTranslate.uploadUrl": {
-					"type": "string",
-					"default": "",
-					"description": "The URL to upload the translation dictionary"
-				},
 				"hiloTranslate.enableUpload": {
 					"type": "boolean",
 					"default": true,
 					"description": "Enable automatic upload of translations.json to Azure Blob Storage after export."
-				},
-				"hiloTranslate.cosmosEndpoint": {
-				"type": "string",
-				"default": "",
-				"description": "The endpoint for your Azure Cosmos DB account. Replace <your-account> with your account name."
-				},
-				"hiloTranslate.cosmosKey": {
-					"type": "string",
-					"default": "",
-					"description": "The key for your Azure Cosmos DB account."
 				}
 			}
 		},
@@ -115,6 +75,14 @@
 			{
 				"command": "hiloTranslator.translateSelection",
 				"title": "Translate Selected Text with AI"
+			},
+			{
+				"command": "hiloTranslator.setup",
+				"title": "HiLo: Configure API Keys"
+			},
+			{
+				"command": "hiloTranslator.configStatus",
+				"title": "HiLo: Show Configuration Status"
 			}
 		],
 		"keybindings": [
@@ -139,14 +107,20 @@
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
 		"lint": "eslint",
-		"watch": "tsc -watch -p ./"
+		"watch": "tsc -watch -p ./",
+		"test": "jest",
+		"test:watch": "jest --watch",
+		"test:coverage": "jest --coverage"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.13.0",
 		"@stylistic/eslint-plugin": "^2.9.0",
+		"@types/jest": "^30.0.0",
 		"@types/node": "^20",
 		"@types/vscode": "^1.73.0",
 		"eslint": "^9.13.0",
+		"jest": "^30.2.0",
+		"ts-jest": "^29.4.6",
 		"typescript": "^5.7.2",
 		"typescript-eslint": "^8.16.0"
 	},
