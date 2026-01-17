@@ -3,6 +3,27 @@ import { logCosmosUsage } from '../models/usageLoger';
 import { getCosmosConfig, isCosmosConfigured } from '../setup/configurationManager';
 
 let cosmosClient: CosmosClient | null = null;
+let containerIdCache: string[] | null = null;
+
+const MAX_FUZZY_TERMS = 4;
+const MAX_FUZZY_EXAMPLES = 10;
+const MAX_PER_WORD = 2;
+const MIN_WORD_LEN = 3;
+const MIN_ACRONYM_LEN = 2;
+const STOPWORDS = new Set([
+  'code',
+  'name',
+  'number',
+  'no',
+  'setup',
+  'entry',
+  'type',
+  'value',
+  'line',
+  'document',
+  'status',
+  'date'
+]);
 
 const getCosmosClient = async (): Promise<CosmosClient | null> => {
   // Check if Cosmos is configured
@@ -26,11 +47,22 @@ const getCosmosClient = async (): Promise<CosmosClient | null> => {
   return cosmosClient;
 };
 
+const getContainerIds = async (db: ReturnType<CosmosClient['database']>): Promise<string[]> => {
+  if (containerIdCache) {
+    return containerIdCache;
+  }
+
+  const { resources } = await db.containers.readAll().fetchAll();
+  containerIdCache = resources.map(container => container.id).filter(Boolean);
+  return containerIdCache;
+};
+
 /**
  * Reset the cached Cosmos client (useful when configuration changes)
  */
 export function resetCosmosClient(): void {
   cosmosClient = null;
+  containerIdCache = null;
 }
 
 // Exact match query — returns single translation
@@ -42,12 +74,12 @@ export async function lookupExactTranslation(source: string, sourceLang: string)
   }
 
   const db = client.database('translations');
-  const { resources: containers } = await db.containers.readAll().fetchAll();
+  const containerIds = await getContainerIds(db);
 
   let bestMatch: { translated: string, confidence: number } | null = null;
 
-  for (const containerDef of containers) {
-    const container = db.container(containerDef.id);
+  for (const containerId of containerIds) {
+    const container = db.container(containerId);
 
     const query = {
       query: `SELECT TOP 1 c.source, c.target, c.confidence
@@ -61,10 +93,12 @@ export async function lookupExactTranslation(source: string, sourceLang: string)
     };
 
     try {
-      const response = await container.items.query(query).fetchAll();
+      const response = await container.items
+        .query(query, { partitionKey: source })
+        .fetchAll();
       if (response.resources.length > 0) {
         const match = response.resources[0];
-        logCosmosUsage(`Exact match from '${containerDef.id}': matched "${match.source}"`, response.requestCharge);
+        logCosmosUsage(`Exact match from '${containerId}': matched "${match.source}"`, response.requestCharge);
 
         if (!bestMatch || match.confidence > bestMatch.confidence) {
           bestMatch = {
@@ -75,7 +109,7 @@ export async function lookupExactTranslation(source: string, sourceLang: string)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.warn(`Exact match query failed in '${containerDef.id}': ${errorMessage}`);
+      console.warn(`Exact match query failed in '${containerId}': ${errorMessage}`);
     }
   }
 
@@ -91,21 +125,25 @@ export async function lookupFuzzyExamples(source: string, sourceLang: string): P
   }
 
   const db = client.database('translations');
-  const { resources: containers } = await db.containers.readAll().fetchAll();
+  const containerIds = await getContainerIds(db);
 
   const fuzzyExamples: { source: string, target: string }[] = [];
   const seenSources = new Set<string>();
-  const words = source.split(/\s+/).filter(w => w.length > 1);
+  const words = getSearchTerms(source);
+  if (words.length === 0) {
+    return [];
+  }
 
   for (const word of words) {
+    if (fuzzyExamples.length >= MAX_FUZZY_EXAMPLES) break;
     const wordExamples: { source: string, target: string, confidence: number }[] = [];
 
-    for (const containerDef of containers) {
-      const container = db.container(containerDef.id);
+    for (const containerId of containerIds) {
+      const container = db.container(containerId);
 
       const query = {
         query: `
-          SELECT TOP 3 c.source, c.target, c.confidence
+          SELECT TOP 2 c.source, c.target, c.confidence
           FROM c
           WHERE CONTAINS(LOWER(c.source), @term)
             AND c.sourceLang = @sourceLang
@@ -121,7 +159,7 @@ export async function lookupFuzzyExamples(source: string, sourceLang: string): P
         const response = await container.items.query(query).fetchAll();
         const matchedWords = response.resources.map(item => `"${item.source}"`).join(', ');
         logCosmosUsage(
-          `Fuzzy match from '${containerDef.id}' using word "${word}": matched [${matchedWords}]`,
+          `Fuzzy match from '${containerId}' using word "${word}": matched [${matchedWords}]`,
           response.requestCharge
         );
 
@@ -131,7 +169,7 @@ export async function lookupFuzzyExamples(source: string, sourceLang: string): P
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        console.warn(`Fuzzy match query failed in '${containerDef.id}' for word "${word}": ${errorMessage}`);
+        console.warn(`Fuzzy match query failed in '${containerId}' for word "${word}": ${errorMessage}`);
       }
     }
 
@@ -144,10 +182,11 @@ export async function lookupFuzzyExamples(source: string, sourceLang: string): P
 
     // Sort by confidence DESC and take top 3
     filteredWordExamples.sort((a, b) => b.confidence - a.confidence);
-    const top3PerWord = filteredWordExamples.slice(0, 3);
+    const topPerWord = filteredWordExamples.slice(0, MAX_PER_WORD);
 
     // Add to overall, dedup
-    for (const example of top3PerWord) {
+    for (const example of topPerWord) {
+      if (fuzzyExamples.length >= MAX_FUZZY_EXAMPLES) break;
       if (!seenSources.has(example.source)) {
         fuzzyExamples.push({ source: example.source, target: example.target });
         seenSources.add(example.source);
@@ -156,4 +195,29 @@ export async function lookupFuzzyExamples(source: string, sourceLang: string): P
   }
 
   return fuzzyExamples;
+}
+
+function getSearchTerms(text: string): string[] {
+  const tokens = text.split(/\s+/).map(sanitizeToken).filter(Boolean);
+  if (tokens.length === 0) return [];
+
+  const acronymTokens = tokens
+    .filter(t => t.length >= MIN_ACRONYM_LEN && /^[A-Z0-9]+$/.test(t));
+
+  const uniqueAcronyms = Array.from(new Set(acronymTokens));
+  if (uniqueAcronyms.length > 0) {
+    return uniqueAcronyms.slice(0, MAX_FUZZY_TERMS);
+  }
+
+  const candidates = tokens
+    .map(t => t.toLowerCase())
+    .filter(t => t.length >= MIN_WORD_LEN && !STOPWORDS.has(t));
+
+  const uniqueCandidates = Array.from(new Set(candidates));
+  uniqueCandidates.sort((a, b) => b.length - a.length);
+  return uniqueCandidates.slice(0, MAX_FUZZY_TERMS);
+}
+
+function sanitizeToken(token: string): string {
+  return token.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
 }
