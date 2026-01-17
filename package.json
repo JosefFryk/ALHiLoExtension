@@ -2,7 +2,7 @@
 	"name": "HiLo-case",
 	"displayName": "HiLo-case",
 	"description": "Converts text to correct case with use of reference list.",
-	"version": "0.1.14",
+	"version": "0.1.22",
 	"publisher": "forey-apps",
 	"repository": "https://github.com/JosefFryk/ALHiLoExtension",
 	"engines": {
@@ -11,7 +11,20 @@
 	"categories": [
 		"Other"
 	],
-	"activationEvents": [],
+	"activationEvents": [
+		"onCommand:textCorrection.toLowerCase",
+		"onCommand:textCorrection.correctCase",
+		"onCommand:textCorrection.addWordToList",
+		"onCommand:hiloTranslator.translateByAI",
+		"onCommand:hiloTranslator.exportTranslationDictionary",
+		"onCommand:hiloTranslator.exportTranslationToDB",
+		"onCommand:hiloTranslator.applyCorrectionsFromCosmos",
+		"onCommand:hiloTranslator.importExcelCorrections",
+		"onCommand:hiloTranslator.applyExcelCorrections",
+		"onCommand:hiloTranslator.translateSelection",
+		"onCommand:hiloTranslator.setup",
+		"onCommand:hiloTranslator.configStatus"
+	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"configuration": {
@@ -50,31 +63,43 @@
 		"commands": [
 			{
 				"command": "textCorrection.toLowerCase",
-				"title": "Convert to Lowercase"
+				"title": "HiLo: Convert to Lowercase"
 			},
 			{
 				"command": "textCorrection.correctCase",
-				"title": "Correct Case in Document"
+				"title": "HiLo: Correct Case in Document"
 			},
 			{
 				"command": "textCorrection.addWordToList",
-				"title": "Add Word to Reference List"
+				"title": "HiLo: Add Word to Reference List"
 			},
 			{
 				"command": "hiloTranslator.translateByAI",
-				"title": "Translate by AI"
+				"title": "HiLo: Translate by AI"
 			},
 			{
 				"command": "hiloTranslator.exportTranslationDictionary",
-				"title": "Export Translations from XLIFF to JSON"
+				"title": "HiLo: Export Translations from XLIFF to JSON"
 			},
 			{
 				"command": "hiloTranslator.exportTranslationToDB",
-				"title": "Export Translations to Azure Cosmos DB"
+				"title": "HiLo: Export Translations to Azure Cosmos DB"
+			},
+			{
+				"command": "hiloTranslator.applyCorrectionsFromCosmos",
+				"title": "HiLo: Apply Corrections from Cosmos DB to XLIFF"
+			},
+			{
+				"command": "hiloTranslator.importExcelCorrections",
+				"title": "HiLo: Import Corrections from Excel"
+			},
+			{
+				"command": "hiloTranslator.applyExcelCorrections",
+				"title": "HiLo: Apply Excel Corrections to XLIFF"
 			},
 			{
 				"command": "hiloTranslator.translateSelection",
-				"title": "Translate Selected Text with AI"
+				"title": "HiLo: Translate Selected Text with AI"
 			},
 			{
 				"command": "hiloTranslator.setup",
@@ -129,6 +154,7 @@
 		"axios": "^1.9.0",
 		"dotenv": "^16.5.0",
 		"fast-xml-parser": "^5.2.1",
-		"uuid": "^11.1.0"
+		"uuid": "^11.1.0",
+		"xlsx": "^0.18.5"
 	}
 }

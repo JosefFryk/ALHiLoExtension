@@ -3,6 +3,9 @@ import { toLowerCase, addWordToList, correctCase } from './commands/textCorrecti
 import { translateTextAI, translateSelectionCommand } from './commands/translationCommands';
 import { exportTranslationDictionary } from './commands/exportTranslationDictionary';
 import { exportTranslationToDB } from './commands/exportTranslationToDB';
+import { applyCorrectionsFromCosmos } from './commands/applyCorrectionsFromCosmos';
+import { importExcelCorrections } from './commands/importExcelCorrections';
+import { applyExcelCorrections } from './commands/applyExcelCorrections';
 import { initConfigManager } from './setup/configurationManager';
 import { runSetupCommand, checkFirstRunSetup, showConfigStatus } from './setup/setupCommand';
 
@@ -18,6 +21,9 @@ export function activate(context: vscode.ExtensionContext) {
     const exportTranslationDictionaryCmd = vscode.commands.registerCommand('hiloTranslator.exportTranslationDictionary', () => exportTranslationDictionary());
     const exportTranslationToDBCmd = vscode.commands.registerCommand('hiloTranslator.exportTranslationToDB', () => exportTranslationToDB());
     const translateSelectionCmd = vscode.commands.registerCommand('hiloTranslator.translateSelection', () => translateSelectionCommand());
+    const applyCorrectionsFromCosmosCmd = vscode.commands.registerCommand('hiloTranslator.applyCorrectionsFromCosmos', () => applyCorrectionsFromCosmos());
+    const importExcelCorrectionsCmd = vscode.commands.registerCommand('hiloTranslator.importExcelCorrections', () => importExcelCorrections());
+    const applyExcelCorrectionsCmd = vscode.commands.registerCommand('hiloTranslator.applyExcelCorrections', () => applyExcelCorrections());
 
     // Setup commands
     const setupCmd = vscode.commands.registerCommand('hiloTranslator.setup', () => runSetupCommand());
@@ -31,6 +37,9 @@ export function activate(context: vscode.ExtensionContext) {
         exportTranslationDictionaryCmd,
         exportTranslationToDBCmd,
         translateSelectionCmd,
+        applyCorrectionsFromCosmosCmd,
+        importExcelCorrectionsCmd,
+        applyExcelCorrectionsCmd,
         setupCmd,
         configStatusCmd
     );

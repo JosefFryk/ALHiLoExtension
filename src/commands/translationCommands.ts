@@ -8,6 +8,18 @@ interface TranslationQuickPickItem extends vscode.QuickPickItem {
   __payload?: { translated: string; confidence: number; unitId?: string };
 }
 
+async function ensureDocumentSaved(file: vscode.TextDocument): Promise<boolean> {
+  if (!file.isDirty) {
+    return true;
+  }
+
+  const saved = await file.save();
+  if (!saved) {
+    vscode.window.showErrorMessage('Failed to save the file. Translation canceled.');
+  }
+  return saved;
+}
+
 async function replaceBlock(editor: vscode.TextEditor, block: string, start: number, end: number, translatedBlock: string) {
   const range = new vscode.Range(
     editor.document.positionAt(start),
@@ -73,6 +85,11 @@ export async function translateAndLog(
   targetLang: string,
   numOptions = 1
 ) {
+  const canProceed = await ensureDocumentSaved(file);
+  if (!canProceed) {
+    return;
+  }
+
   // NEW: build index once (O(N)) from the currently opened document text
   const openText = file.getText();
   const openIndex = buildOpenFileTranslationIndex(openText);
