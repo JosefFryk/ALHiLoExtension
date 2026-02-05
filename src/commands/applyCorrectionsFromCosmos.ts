@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { CosmosClient } from '@azure/cosmos';
 import { getCosmosConfig, isCosmosConfigured } from '../setup/configurationManager';
-import { findXliffCandidatesFromDom, DomMatchContext } from '../xliff/xliffMatcher';
+import { findXliffCandidatesFromDomWithDiagnostics, DomMatchContext, MatchDiagnostics } from '../xliff/xliffMatcher';
 import { xmlEscape, xmlUnescape } from '../utils/stringUtils';
 
 interface CorrectionItem {
@@ -11,6 +11,20 @@ interface CorrectionItem {
   target?: string;
   elementContext?: unknown;
   translationType?: string;
+  area?: string;
+  pageId?: number;
+  pageName?: string;
+  timestamp?: string;
+  sourceTableId?: number;
+  tableName?: string;
+}
+
+interface SyncRecord {
+  id: string;
+  xliffFile: string;
+  lastSyncTimestamp: string;
+  lastSyncBy?: string;
+  correctionsApplied?: number;
 }
 
 interface UpdateStats {
@@ -19,6 +33,26 @@ interface UpdateStats {
   unmatched: number;
   conflicts: number;
   skipped: number;
+}
+
+interface ReportItem {
+  cosmosId: string;
+  source: string;
+  target: string;
+  area?: string;
+  pageName?: string;
+  pageId?: number;
+  tableName?: string;
+  sourceTableId?: number;
+  status: 'applied' | 'unchanged' | 'unmatched' | 'conflict' | 'skipped';
+  matchedUnits: Array<{
+    unitId: string;
+    note?: string;
+    confidence: number;
+    previousTarget?: string;
+  }>;
+  reason?: string;
+  diagnostics?: MatchDiagnostics;
 }
 
 export async function applyCorrectionsFromCosmos() {
@@ -34,14 +68,36 @@ export async function applyCorrectionsFromCosmos() {
   const containerId = await pickContainer(client, dbId);
   if (!containerId) return;
 
+  const container = client.database(dbId).container(containerId);
+
+  // Get or create sync container and read last sync timestamp
+  const syncContainer = await getOrCreateSyncContainer(client, dbId);
+  const xliffFileName = xliffPath.substring(xliffPath.lastIndexOf(xliffPath.includes('/') ? '/' : '\\') + 1);
+  const lastSync = await getLastSyncTimestamp(syncContainer, xliffFileName);
+
+  // Ask user: use timestamp filter or fetch all
+  let timestampFilter: string | undefined;
+  if (lastSync) {
+    const syncChoice = await vscode.window.showQuickPick(
+      [
+        `Only new corrections (since ${formatTimestamp(lastSync.lastSyncTimestamp)})`,
+        'All corrections (ignore last sync)'
+      ],
+      { placeHolder: `Last sync: ${formatTimestamp(lastSync.lastSyncTimestamp)}` }
+    );
+    if (!syncChoice) return;
+    if (syncChoice.startsWith('Only new')) {
+      timestampFilter = lastSync.lastSyncTimestamp;
+    }
+  }
+
   const filterChoice = await vscode.window.showQuickPick(
     ['UserCorrection only', 'All items'],
     { placeHolder: 'Select correction filter' }
   );
   if (!filterChoice) return;
 
-  const container = client.database(dbId).container(containerId);
-  const query = buildQuery(filterChoice);
+  const query = buildQuery(filterChoice, undefined, timestampFilter);
 
   let resources: CorrectionItem[] = [];
   try {
@@ -54,12 +110,16 @@ export async function applyCorrectionsFromCosmos() {
   }
 
   if (resources.length === 0) {
-    vscode.window.showInformationMessage('No corrections found in the selected container.');
+    const msg = timestampFilter
+      ? 'No new corrections found since last sync.'
+      : 'No corrections found in the selected container.';
+    vscode.window.showInformationMessage(msg);
     return;
   }
 
   const xliffContent = fs.readFileSync(xliffPath, 'utf8');
-  const updates = new Map<string, { translated: string; source: string }>();
+  const updates = new Map<string, { translated: string; source: string; cosmosId: string }>();
+  const reportItems: ReportItem[] = [];
 
   const stats: UpdateStats = {
     updated: 0,
@@ -68,6 +128,9 @@ export async function applyCorrectionsFromCosmos() {
     conflicts: 0,
     skipped: 0
   };
+
+  // Pre-extract existing targets for the report
+  const existingTargets = extractExistingTargets(xliffContent);
 
   await vscode.window.withProgress(
     {
@@ -83,34 +146,86 @@ export async function applyCorrectionsFromCosmos() {
         processed++;
         progress.report({ increment: 100 / total, message: `${processed}/${total}` });
 
+        const cosmosId = toText(item.id);
         const source = toText(item.source);
         const target = toText(item.target);
+
+        const reportItem: ReportItem = {
+          cosmosId,
+          source,
+          target,
+          area: item.area,
+          pageName: item.pageName,
+          pageId: item.pageId,
+          tableName: item.tableName,
+          sourceTableId: item.sourceTableId,
+          status: 'unmatched',
+          matchedUnits: []
+        };
+
         if (!source || !target) {
           stats.skipped++;
+          reportItem.status = 'skipped';
+          reportItem.reason = !source ? 'Empty source text' : 'Empty target text';
+          reportItems.push(reportItem);
           continue;
         }
 
         const ctx = buildDomContext(item, source);
-        const candidates = findXliffCandidatesFromDom(xliffContent, ctx);
+        // Find ALL matching trans-units - this includes both Table fields and Page controls
+        // when the captured element is a Column (list pages often inherit captions from tables)
+        const { candidates, diagnostics } = findXliffCandidatesFromDomWithDiagnostics(xliffContent, ctx);
+        reportItem.diagnostics = diagnostics;
+
         if (!candidates.length) {
           stats.unmatched++;
+          reportItem.status = 'unmatched';
+          reportItem.reason = diagnostics.filterReason || 'No matching XLIFF trans-units found';
+          reportItems.push(reportItem);
           continue;
         }
 
+        let hasConflict = false;
+        // Apply correction to ALL matching trans-units (e.g., both Table field and Page control)
         for (const candidate of candidates) {
           const existing = updates.get(candidate.unitId);
           if (existing && existing.translated !== target) {
             stats.conflicts++;
+            hasConflict = true;
+            reportItem.matchedUnits.push({
+              unitId: candidate.unitId,
+              note: candidate.note,
+              confidence: candidate.confidence,
+              previousTarget: existingTargets.get(candidate.unitId)
+            });
             continue;
           }
-          updates.set(candidate.unitId, { translated: target, source });
+          updates.set(candidate.unitId, { translated: target, source, cosmosId });
+          reportItem.matchedUnits.push({
+            unitId: candidate.unitId,
+            note: candidate.note,
+            confidence: candidate.confidence,
+            previousTarget: existingTargets.get(candidate.unitId)
+          });
         }
+
+        if (hasConflict) {
+          reportItem.status = 'conflict';
+          reportItem.reason = 'Different correction already exists for same trans-unit';
+        } else {
+          reportItem.status = 'applied';
+        }
+        reportItems.push(reportItem);
       }
     }
   );
 
   if (updates.size === 0) {
-    vscode.window.showInformationMessage('No matching XLIFF units found for the corrections.');
+    // Generate report even if no updates
+    const reportPath = await generateReport(xliffPath, reportItems, stats);
+    vscode.window.showInformationMessage(
+      `No matching XLIFF units found for the corrections. Report saved to: ${reportPath}`
+    );
     return;
   }
 
@@ -118,17 +233,30 @@ export async function applyCorrectionsFromCosmos() {
   stats.updated = result.updated;
   stats.unchanged = result.unchanged;
 
-  if (result.updated === 0) {
-    vscode.window.showInformationMessage('All matching translations already match the corrected text.');
-    return;
+  // Update report items with actual applied/unchanged status
+  updateReportItemsWithResults(reportItems, result.updatedUnits, result.unchangedUnits);
+
+  if (result.updated > 0) {
+    fs.writeFileSync(xliffPath, result.text, 'utf8');
   }
 
-  fs.writeFileSync(xliffPath, result.text, 'utf8');
+  // Update sync timestamp in Cosmos
+  const appliedCount = reportItems.filter(r => r.status === 'applied' || r.status === 'unchanged').length;
+  await updateSyncTimestamp(syncContainer, xliffFileName, appliedCount);
 
-  vscode.window.showInformationMessage(
+  // Generate report file
+  const reportPath = await generateReport(xliffPath, reportItems, stats);
+
+  const action = await vscode.window.showInformationMessage(
     `Applied ${stats.updated} updates (${stats.unchanged} unchanged, ${stats.unmatched} unmatched, ` +
-    `${stats.conflicts} conflicts, ${stats.skipped} skipped).`
+    `${stats.conflicts} conflicts, ${stats.skipped} skipped). Report saved.`,
+    'Open Report'
   );
+
+  if (action === 'Open Report') {
+    const doc = await vscode.workspace.openTextDocument(reportPath);
+    await vscode.window.showTextDocument(doc);
+  }
 }
 
 async function getCosmosClient(): Promise<CosmosClient | null> {
@@ -207,22 +335,61 @@ async function pickContainer(client: CosmosClient, dbId: string): Promise<string
   }
 }
 
-function buildQuery(choice: string) {
+async function pickArea(container: ReturnType<ReturnType<CosmosClient['database']>['container']>): Promise<string | null | undefined> {
+  // Fetch distinct areas from the container
+  const areaQuery = {
+    query: `SELECT DISTINCT VALUE c.area FROM c WHERE IS_DEFINED(c.area) AND c.area != ""`
+  };
+
+  let areas: string[] = [];
+  try {
+    const response = await container.items.query<string>(areaQuery).fetchAll();
+    areas = (response.resources || []).filter(Boolean).sort();
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    vscode.window.showWarningMessage(`Failed to fetch areas: ${errorMessage}. Proceeding without area filter.`);
+    return undefined; // undefined means no area filter (all areas)
+  }
+
+  if (areas.length === 0) {
+    return undefined; // No areas found, proceed without filter
+  }
+
+  const options = ['All areas', ...areas];
+  const pick = await vscode.window.showQuickPick(options, {
+    placeHolder: 'Select area to apply corrections from'
+  });
+
+  if (!pick) return null; // User cancelled
+  if (pick === 'All areas') return undefined; // No filter
+  return pick; // Selected area
+}
+
+function buildQuery(choice: string, area?: string, sinceTimestamp?: string) {
+  const parameters: Array<{ name: string; value: string }> = [];
+  let whereClause = 'WHERE IS_DEFINED(c.target) AND c.target != ""';
+
   if (choice === 'UserCorrection only') {
-    return {
-      query: `SELECT c.id, c.source, c.target, c.elementContext, c.translationType
-              FROM c
-              WHERE IS_DEFINED(c.target)
-                AND c.target != ""
-                AND c.translationType = @type`,
-      parameters: [{ name: '@type', value: 'UserCorrection' }]
-    };
+    whereClause += ' AND c.translationType = @type';
+    parameters.push({ name: '@type', value: 'UserCorrection' });
+  }
+
+  if (area) {
+    whereClause += ' AND c.area = @area';
+    parameters.push({ name: '@area', value: area });
+  }
+
+  if (sinceTimestamp) {
+    whereClause += ' AND c.timestamp > @sinceTimestamp';
+    parameters.push({ name: '@sinceTimestamp', value: sinceTimestamp });
   }
 
   return {
-    query: `SELECT c.id, c.source, c.target, c.elementContext, c.translationType
+    query: `SELECT c.id, c.source, c.target, c.elementContext, c.translationType, c.area, c.pageId, c.pageName, c.timestamp, c.sourceTableId, c.tableName
             FROM c
-            WHERE IS_DEFINED(c.target) AND c.target != ""`
+            ${whereClause}
+            ORDER BY c.timestamp ASC`,
+    parameters: parameters.length > 0 ? parameters : undefined
   };
 }
 
@@ -257,7 +424,11 @@ function buildDomContext(item: CorrectionItem, source: string): DomMatchContext 
     placeholder: toText(ctx.placeholder),
     dataAttributes,
     isToolTip,
-    translatedText: source
+    translatedText: source,
+    pageName: toText(item.pageName),
+    pageId: item.pageId,
+    sourceTableId: item.sourceTableId,
+    tableName: toText(item.tableName)
   };
 }
 
@@ -283,10 +454,12 @@ function toText(value: unknown): string {
 
 function applyUpdatesToXliff(
   content: string,
-  updates: Map<string, { translated: string }>
-): { text: string; updated: number; unchanged: number } {
+  updates: Map<string, { translated: string; cosmosId?: string }>
+): { text: string; updated: number; unchanged: number; updatedUnits: Set<string>; unchangedUnits: Set<string> } {
   let updated = 0;
   let unchanged = 0;
+  const updatedUnits = new Set<string>();
+  const unchangedUnits = new Set<string>();
 
   const unitRe = /<trans-unit\b[^>]*\bid="([^"]+)"[^>]*>[\s\S]*?<\/trans-unit>/gi;
   const text = content.replace(unitRe, (unit, unitId) => {
@@ -296,13 +469,15 @@ function applyUpdatesToXliff(
     const replaced = updateUnitTarget(unit, update.translated);
     if (replaced === unit) {
       unchanged++;
+      unchangedUnits.add(unitId);
     } else {
       updated++;
+      updatedUnits.add(unitId);
     }
     return replaced;
   });
 
-  return { text, updated, unchanged };
+  return { text, updated, unchanged, updatedUnits, unchangedUnits };
 }
 
 function updateUnitTarget(unit: string, translated: string): string {
@@ -341,4 +516,175 @@ function detectIndent(unit: string): string {
 
 function normalizeForCompare(text: string): string {
   return String(text ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function extractExistingTargets(xliffContent: string): Map<string, string> {
+  const targets = new Map<string, string>();
+  const unitRe = /<trans-unit\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/trans-unit>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = unitRe.exec(xliffContent)) !== null) {
+    const unitId = match[1];
+    const unitContent = match[2];
+    const targetMatch = unitContent.match(/<target\b[^>]*>([\s\S]*?)<\/target>/i);
+    if (targetMatch) {
+      targets.set(unitId, xmlUnescape(targetMatch[1]));
+    }
+  }
+
+  return targets;
+}
+
+function updateReportItemsWithResults(
+  reportItems: ReportItem[],
+  updatedUnits: Set<string>,
+  unchangedUnits: Set<string>
+): void {
+  for (const item of reportItems) {
+    if (item.status !== 'applied') continue;
+
+    // Check if any of the matched units were actually updated
+    let hasUpdated = false;
+    let hasUnchanged = false;
+
+    for (const mu of item.matchedUnits) {
+      if (updatedUnits.has(mu.unitId)) {
+        hasUpdated = true;
+      }
+      if (unchangedUnits.has(mu.unitId)) {
+        hasUnchanged = true;
+      }
+    }
+
+    if (!hasUpdated && hasUnchanged) {
+      item.status = 'unchanged';
+      item.reason = 'Target already matches correction';
+    }
+  }
+}
+
+async function generateReport(
+  xliffPath: string,
+  reportItems: ReportItem[],
+  stats: UpdateStats
+): Promise<string> {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+  const xliffDir = xliffPath.substring(0, xliffPath.lastIndexOf(fs.existsSync(xliffPath) ? (xliffPath.includes('/') ? '/' : '\\') : '/'));
+  const xliffName = xliffPath.substring(xliffPath.lastIndexOf(xliffPath.includes('/') ? '/' : '\\') + 1).replace(/\.[^.]+$/, '');
+  const reportPath = `${xliffDir}${xliffPath.includes('/') ? '/' : '\\'}correction-report-${xliffName}-${timestamp}.json`;
+
+  const report = {
+    generatedAt: new Date().toISOString(),
+    xliffFile: xliffPath,
+    summary: {
+      totalCorrections: reportItems.length,
+      applied: reportItems.filter(r => r.status === 'applied').length,
+      unchanged: reportItems.filter(r => r.status === 'unchanged').length,
+      unmatched: reportItems.filter(r => r.status === 'unmatched').length,
+      conflicts: reportItems.filter(r => r.status === 'conflict').length,
+      skipped: reportItems.filter(r => r.status === 'skipped').length,
+      xliffUpdated: stats.updated,
+      xliffUnchanged: stats.unchanged
+    },
+    corrections: reportItems.map(item => ({
+      cosmosId: item.cosmosId,
+      status: item.status,
+      source: item.source,
+      target: item.target,
+      area: item.area,
+      pageName: item.pageName,
+      pageId: item.pageId,
+      tableName: item.tableName,
+      sourceTableId: item.sourceTableId,
+      reason: item.reason,
+      diagnostics: item.diagnostics ? {
+        searchedText: item.diagnostics.searchedText,
+        normalizedSearchText: item.diagnostics.normalizedSearchText,
+        textMatchCount: item.diagnostics.textMatchCount,
+        propertyFilteredCount: item.diagnostics.propertyFilteredCount,
+        pageTableFilteredCount: item.diagnostics.pageTableFilteredCount,
+        finalMatchCount: item.diagnostics.finalMatchCount,
+        sampleTextMatches: item.diagnostics.sampleTextMatches,
+        filterReason: item.diagnostics.filterReason
+      } : undefined,
+      matchedUnits: item.matchedUnits.map(mu => ({
+        unitId: mu.unitId,
+        note: mu.note,
+        confidence: Math.round(mu.confidence * 100) + '%',
+        previousTarget: mu.previousTarget
+      }))
+    }))
+  };
+
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf8');
+  return reportPath;
+}
+
+// Sync container management
+const SYNC_CONTAINER_ID = 'translation_sync';
+
+async function getOrCreateSyncContainer(
+  client: CosmosClient,
+  dbId: string
+): Promise<ReturnType<ReturnType<CosmosClient['database']>['container']>> {
+  const database = client.database(dbId);
+
+  try {
+    // Try to create the container (will succeed if doesn't exist)
+    await database.containers.createIfNotExists({
+      id: SYNC_CONTAINER_ID,
+      partitionKey: { paths: ['/xliffFile'] }
+    });
+  } catch (err) {
+    // Container might already exist, continue
+  }
+
+  return database.container(SYNC_CONTAINER_ID);
+}
+
+async function getLastSyncTimestamp(
+  syncContainer: ReturnType<ReturnType<CosmosClient['database']>['container']>,
+  xliffFileName: string
+): Promise<SyncRecord | null> {
+  const syncId = `sync-${xliffFileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
+  try {
+    const { resource } = await syncContainer.item(syncId, xliffFileName).read<SyncRecord>();
+    return resource || null;
+  } catch (err) {
+    // Document doesn't exist yet
+    return null;
+  }
+}
+
+async function updateSyncTimestamp(
+  syncContainer: ReturnType<ReturnType<CosmosClient['database']>['container']>,
+  xliffFileName: string,
+  correctionsApplied: number
+): Promise<void> {
+  const syncId = `sync-${xliffFileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+  const timestamp = new Date().toISOString();
+
+  const syncRecord: SyncRecord = {
+    id: syncId,
+    xliffFile: xliffFileName,
+    lastSyncTimestamp: timestamp,
+    correctionsApplied
+  };
+
+  try {
+    await syncContainer.items.upsert(syncRecord);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    vscode.window.showWarningMessage(`Failed to update sync timestamp: ${errorMessage}`);
+  }
+}
+
+function formatTimestamp(isoTimestamp: string): string {
+  try {
+    const date = new Date(isoTimestamp);
+    return date.toLocaleString();
+  } catch {
+    return isoTimestamp;
+  }
 }

@@ -208,6 +208,3 @@ export async function importExcelCorrections() {
     vscode.window.showErrorMessage('Failed to import corrections: ' + errorMessage);
   }
 }
-
-
-// upravit kdyz preklad obsahuje lomitko
